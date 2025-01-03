@@ -1,0 +1,240 @@
+<link href="https://unpkg.com/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
+<script type="text/javascript" src="https://unpkg.com/tabulator-tables/dist/js/tabulator.min.js"></script>
+<script type="text/javascript" src="https://oss.sheetjs.com/sheetjs/xlsx.full.min.js"></script>
+<h2>Online Application Processing</h2>
+<div>
+    <button id="file-one-trigger">Select Online Application</button>
+</div>
+
+<div id="one-table"></div>
+<br>
+<div>
+    <button id="file-process-trigger">PROCESS PER OFFICE</button>
+</div>
+
+<div id="update-table"></div>
+<div>
+    <button id="download-csv">Download CSV</button>
+    <button id="download-xls">Download XLS</button>
+    <button id="download-json">Download JSON</button>
+</div>
+<Script>
+    //Build Tabulator
+var table_one = new Tabulator("#one-table", {
+    height:311,
+    layout:"fitColumns",
+    autoColumns:true,
+    placeholder:"Awaiting Data, Master File",
+    pagination:"local",
+    paginationSize:6,
+    paginationSizeSelector:[10, 50, 100, 500],
+    movableColumns:true,
+    paginationCounter:"rows",
+    nestedFieldSeparator:"|",
+    autoColumnsDefinitions:function(definitions){
+        //definitions - array of column definition objects
+        definitions.forEach((column) => {
+            column.headerFilter = true; 
+        });
+
+        return definitions;
+    },
+});
+
+function formatNumber(input) {
+    input = input.replace(/^\s+|\s+$/gm,'');
+    var parts = input.replace("-", '');
+    if (parts.length !== 11) {
+        throw new Error('Input format is incorrect. Expected format: XX-XXXXXXXXX');
+    }
+    
+    const yearPart = parts.substring(0, 4); 
+    const serialNumberPart = parts.substr(4);    
+    const formattedNumber = `${yearPart}-${serialNumberPart}`;
+    
+    return formattedNumber;
+}
+
+function customCSV(input){
+        var data = [],
+		row = 0, 
+		col = 0,
+		inQuote = false;
+	    
+		//Iterate over each character
+		for (let index = 0; index < input.length; index++) {
+			let char = input[index], 
+			nextChar = input[index+1];      
+	        
+			//Initialize empty row
+			if(!data[row]){
+				data[row] = [];
+			}
+
+			//Initialize empty column
+			if(!data[row][col]){
+				data[row][col] = "";
+			}
+	        
+			//Handle quotation mark inside string
+			if (char == '"' && inQuote && nextChar == '"') { 
+				data[row][col] += char; 
+				index++;
+				continue; 
+			}
+	        
+			//Begin / End Quote
+			if (char == '"') { 
+				inQuote = !inQuote;
+				continue;
+			}
+	        
+			//Next column (if not in quote)
+			if (char == ',' && !inQuote) { 
+				col++;
+				continue; 
+			}
+	        
+			//New row if new line and not in quote (CRLF) 
+			if (char == '\r' && nextChar == '\n' && !inQuote) { 
+				col = 0; 
+				row++; 
+				index++; 
+				continue; 
+			}
+	        
+			//New row if new line and not in quote (CR or LF) 
+			if ((char == '\r' || char == '\n') && !inQuote) { 
+				col = 0;
+				row++;
+				continue; 
+			}        
+            
+            
+
+			//Normal Character, append to column
+			data[row][col] += char;
+		}
+
+        var table =[];
+        var row_counter =0;
+        for (const value of data) {
+           
+            if(value[1] == '') {
+                row_counter++;
+                continue;
+            }    
+
+            var tmp = value[4];
+            value[4] = value[1];
+            value[1] = tmp;
+
+            if(value[18] == 'Release Date'){
+                value[18] = "Release Date_1";
+            }
+
+            table.push(value);
+            row_counter++;
+        }
+
+
+        
+    return (table);
+}
+//trigger AJAX load on "Load Data via AJAX" button click
+document.getElementById("file-one-trigger").addEventListener("click", function(){
+    table_one.import(customCSV, ".csv");
+});
+
+function replace_newline(value, data, type, params, column){
+    var str = '';
+    if(value){
+        var v = value.split("<br>");
+        counter =1;
+        for (var i = 0; i < v.length; i++){
+            v[i] = counter + " - " + v[i] + "\n----------------\n";
+            counter++;
+        }
+        str = v.join(" ");
+        //str = value.replace(/<br>/g, "\n----------------\n");
+    }
+    return str;
+}
+
+function replace_none(value, data, type, params, column){
+    var str = '';
+    if(value){
+        var v = value.split("<br>");
+        counter =1;
+        for (var i = 0; i < v.length; i++){
+            v[i] = counter + " - " + v[i] + "<br>----------------<br>";
+            counter++;
+        }
+        str = v.join(" ");
+        //str = value.replace(/<br>/g, "\n----------------\n");
+    }
+    return str;
+}
+
+var table_update = new Tabulator("#update-table", {
+    height:311,
+    layout:"fitColumns",
+    autoColumns:true,
+    placeholder:"Awaiting Data, Updated File",
+    pagination:"local",
+    paginationSize:6,
+    paginationSizeSelector:[10, 50, 100, 500],
+    movableColumns:true,
+    paginationCounter:"rows",
+    nestedFieldSeparator:"|",
+    autoColumnsDefinitions:function(definitions){
+
+
+        //definitions - array of column definition objects
+        definitions.forEach((column) => {
+            column.headerFilter = true; 
+        });
+
+        return definitions;
+    },
+});
+
+
+document.getElementById("file-process-trigger").addEventListener("click", function(){
+   var table_1 = table_one.getData();
+   var tb_1 ={};
+   var master_tb = {};
+   for (const value of table_1) {
+        var yr_id = value['No'] || '';
+        var id = yr_id.trim();
+        if(!tb_1[id]){
+            tb_1[id] = [];
+        }
+     
+        delete value[''];
+        tb_1[id] = value;
+
+    }
+    master_tb = Object.values(tb_1);
+    table_update.setData(master_tb);
+
+});
+
+
+
+//trigger download of data.csv file
+document.getElementById("download-xls").addEventListener("click", function(){
+    table_update.download("xlsx", "data.xlsx", {sheetName:"Data"});
+});
+
+document.getElementById("download-csv").addEventListener("click", function(){
+    table_update.download("csv", "data.csv", {bom:true});
+});
+
+//trigger download of data.json file
+document.getElementById("download-json").addEventListener("click", function(){
+    table_update.download("json", "data.json");
+});
+
+
+</Script>
