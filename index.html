@@ -198,19 +198,24 @@ var table_update = new Tabulator("#update-table", {
         return definitions;
     },
 });
-
+	
 function formatPermit(value) {
-  value = value.trim();
+  if (!value) return value;
+
+  value = value.toString().trim();
 
   const isTMP = value.startsWith("TMP-");
-  const raw = isTMP ? value.replace("TMP-", "") : value;
 
-  // split: YYYY + running number
+  // remove TMP- and dashes
+  const raw = value.replace(/^TMP-/, "").replace(/-/g, "");
+
+  // extract parts
   const year = raw.substring(0, 4);
   const seq  = raw.substring(4).padStart(7, "0");
 
   return `192-00-${isTMP ? "TMP-" : ""}${year}-${seq}`;
 }
+
 
 document.getElementById("file-process-trigger").addEventListener("click", function(){
    var table_1 = table_one.getData();
